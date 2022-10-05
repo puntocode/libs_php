@@ -1,0 +1,157 @@
+<?php
+namespace skytel\notificaciones;
+
+/**
+ * [LIBS_PHP] , Skytel. All Rights Reserved. [2013].
+ *
+ * @author Endrigo Rivas <endrigo.rivas@gmail.com>
+ * 
+ * $Id$
+ */
+?>
+<?php
+
+class Beeper {
+
+    private $ipServer;
+    private $port;
+    private $timeOut;
+    private $errno;
+    private $errMsg;
+    private $timeoutSocket; //?
+    private $httpQuery;
+
+    /**
+     * 
+     * @param type $ipServer
+     * @param type $timeOut
+     * @param type $port
+     */
+    public function __construct($ipServer, $port = "80", $timeOut = "180") {
+        $this->ipServer = $ipServer;
+        $this->port = $port;
+        $this->timeOut = $timeOut;
+
+        //Internal attributes
+        $this->errno = 0;
+        $this->errMsg = "";
+        $this->timeoutSocket = 20;
+        $this->httpQuery = "";
+    }
+
+    /**
+     * 
+     * @param type $pin
+     * @param type $message
+     * @param type $usec
+     * @param type $host
+     * @return string
+     */
+    public function enviarMensaje($pin, $message, $usec = "") {
+        $this->httpQuery = "serialdkey=201074&Data=&tipo=1&min=" . $pin . "&message=" . $this->__encodeMessage($message) . "&usec=" . $usec . "&action=Send+Message";
+
+        $largosuma = strlen($this->httpQuery);
+        $fp = @fsockopen($this->ipServer, $this->port, $this->errno, $this->errMsg, $this->timeOut);
+        if ($fp === false) {
+            $this->errMsg = "Error en la conexión con el servidor (error " . $this->errno . ", " . $this->errMsg . ")";
+            return false;
+        }
+
+        socket_set_timeout($fp, $this->timeoutSocket);
+
+        fputs($fp, "POST /page.html HTTP/1.1\n");
+        fputs($fp, "Host: $this->ipServer\n");
+        fputs($fp, "Content-type: application/x-www-form-urlencoded\n");
+        fputs($fp, "Content-length: " . $largosuma . "\n");
+        fputs($fp, "User-Agent: MSIE\n");
+        fputs($fp, "Connection: close\n\n");
+        fputs($fp, $this->httpQuery);
+
+        $buf = "";
+
+        while (!feof($fp)) {
+            $buf .= fgets($fp, 128);
+        }
+
+        fclose($fp);
+
+        //40 es la longitud de "El programa reporto el siguiente error:"
+        $posicion = strpos($buf, "El programa reporto el siguiente error:");
+        if ($posicion === FALSE) {
+            return true; //mensaje exitoso pues no se encontro el error
+        } else {
+            $this->errMsg = substr($buf, $posicion + 40, strpos($buf, "\n", $posicion + 40) - $posicion - 40);
+            return false;
+        }
+    }
+
+    /**
+     * 
+     * @return type
+     */
+    public function getErrno() {
+        return $this->errno;
+    }
+
+    /**
+     * 
+     * @return type
+     */
+    public function getErrorMsg() {
+        return $this->errMsg;
+    }
+
+    public function getHTTPQuery() {
+        return $this->httpQuery;
+    }
+
+    /**
+     * 
+     * The message is sended using a HTTP Query.  The accents aren't allowed.
+     *  
+     * 
+     *   Caracteres válidos:
+     *   ---------------------
+     *   . ; , : _ ! <> $ ^ * \" - ' = ? /
+     *
+     *   Caracteres inválidos:
+     *   ---------------------
+     *   ¡ º |  \\  + {} ¿  & % () ª # Ñ ñ áéíóúaäëïöüàèìòùçÇ
+     *
+     * 
+     * 
+     * @param type $message
+     * @return type
+     */
+    private function __encodeMessage($message) {
+
+        $someSpecialChars = array(
+            "á", "é", "í", "ó", "ú",
+            "Á", "É", "Í", "Ó", "Ú",
+            "ä", "ë", "ï", "ö", "ü",
+            "Ä", "Ë", "Ï", "Ö", "Ü",
+            "à", "è", "ì", "ò", "ù",
+            "À", "È", "Ì", "Ò", "Ù",
+            "ç", "Ç", "ñ", "Ñ",
+            "¡", "º", "|", "+", "{", "}", "¿", "&", "%", "(", ")", "ª", "#", "\\"
+        );
+
+        $replacementChars = array(
+            "a", "e", "i", "o", "u",
+            "A", "E", "I", "O", "U",
+            "a", "e", "i", "o", "u",
+            "A", "E", "I", "O", "U",
+            "a", "e", "i", "o", "u",
+            "A", "E", "I", "O", "U",
+            "c", "C", "n", "N",
+            "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+        );
+
+        $replaced_string = str_replace($someSpecialChars, $replacementChars, $message);
+//      return $replaced_string;
+        return urlencode($replaced_string);
+    }
+
+}
+
+?>

@@ -1,0 +1,146 @@
+<?php
+
+namespace skytel\procard;
+
+/**
+ * [LIBS_PHP] , Skytel. All Rights Reserved. [2014].
+ *
+ * @author Endrigo Rivas <endrigo.rivas@gmail.com>
+ * 
+ * $Id$
+ */
+?>
+<?php
+
+class PaylineWrapper {
+
+    const IP_SERVER = "payline.skytel.com.py";
+
+    /**
+     * Genera una nueva transacción
+     * 
+     * @param Integer $amount
+     * @param String $auth El token de autorización.
+     * 
+     * @throws \InvalidArgumentException
+     */
+    public function newTransaction($amount, $auth) {
+
+        //Validacion
+        if ($amount == "") {
+            throw new \InvalidArgumentException("El monto esta vacio!");
+        }
+
+        //Validacion
+        if ($auth == "") {
+            throw new \InvalidArgumentException("El campo auth esta vacio!");
+        }
+
+        $url = "http://" . self::IP_SERVER . "/redirect.php";
+        $url .= "?amount=$amount";
+        $url .= "&auth=$auth";
+
+        $this->_redirectTo($url);
+    }
+
+    /**
+     * Retorna el resultado de la transaccion en formato JSON
+     * 
+     * @param String $uuid El identificador único de la transacción.
+     * @param String $auth El token de autorización.
+     * 
+     * @return String Resultado en formato JSON
+     * 
+     * @throws \InvalidArgumentException
+     */
+    public function checkResult($uuid, $auth) {
+
+        //Validacion
+        if ($uuid === "") {
+            throw new \InvalidArgumentException("UUID vacio!");
+        }
+
+        //Validacion
+        if ($auth == "") {
+            throw new \InvalidArgumentException("El campo auth esta vacio!");
+        }
+
+        $url = "http://" . self::IP_SERVER . "/checkResult.php";
+        $url .= "?uuid=$uuid";
+        $url .= "&auth=$auth";
+
+        /* @var $procard Procard */
+        $resp = $this->_wget($url);
+
+        return json_encode($resp);
+    }
+
+    /**
+     * Anula una transacción
+     * 
+     * @param String $uuid El identificador único de la transacción.
+     * 
+     * @return String Resultado en formato JSON
+     * 
+     * @throws \InvalidArgumentException
+     */
+    public function transactionRollback($uuid) {
+        //Validacion
+        if ($uuid === "") {
+            throw new \InvalidArgumentException("UUID vacio!");
+        }
+        
+        return "";
+    }
+
+    /**
+     * This function send headers, but first analize if headers was sended.
+     * 
+     * Use the function header(), or otherwise use <meta>
+     *  
+     * @param String $url 
+     */
+    private function _redirectTo($url) {
+
+        if (!headers_sent()) {
+            header("Location: {$url}");
+            exit;
+        } else {
+            echo "<meta http-equiv=\"refresh\" content=\"0;url={$url}\">\r\n";
+            exit;
+        }
+    }
+
+    /**
+     * Invoca a la URL, según parámetro
+     * 
+     * @param string url a invocar
+     * @param array parámetros a enviar
+     * 
+     * @return string respuesta en formato JSON
+     */
+    private function _wget($url) {
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+        //Added by Endrigo Rivas
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 60); // 1 minuto
+        curl_setopt($ch, CURLOPT_TIMEOUT, 300); // 5 minutos
+
+        $resp = curl_exec($ch);
+
+//        var_dump($resp);
+//        die("----AAAA");
+        $json = json_decode($resp);
+
+        if (!$json) {
+            throw new \RuntimeException($resp);
+        }
+
+        curl_close($ch);
+        return $json;
+    }
+
+}

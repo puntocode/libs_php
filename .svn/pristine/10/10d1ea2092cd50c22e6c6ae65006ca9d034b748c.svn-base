@@ -1,0 +1,68 @@
+<?php
+
+namespace skytel\utils\json;
+
+/**
+ * Metodos de utilería para JSON
+ *
+ * @author Endrigo Rivas <endrigo.rivas@gmail.com>
+ * 
+ * $Id$
+ */
+class JsonUtils {
+
+    /**
+     * 
+     * Verifica si el formato corresponde con el standard JSON.
+     * 
+     * @param string String
+     * @return boolean 
+     */
+    public static function isJson($string) {
+        @json_decode($string);
+        return (json_last_error() == JSON_ERROR_NONE);
+    }
+
+    /**
+     * A partir del código de error nos muestra el mensaje de error en el JSON. 
+     * 
+     * Captura el ultimo error causado por la funcion json_decode().
+     * 
+     * @return String
+     */
+    public static function getJSONErrorMsg() {
+
+        $code = json_last_error();
+        
+        //available since PHP >= 5.5
+        if (function_exists('json_last_error_msg')) {
+            return "Code: $code. Message:" . json_last_error_msg();
+        }
+
+        switch ($code) {
+            case JSON_ERROR_NONE:
+                $msg = 'No errors';
+                break;
+            case JSON_ERROR_DEPTH:
+                $msg = 'Maximum stack depth exceeded';
+                break;
+            case JSON_ERROR_STATE_MISMATCH:
+                $msg = 'Underflow or modes mismatch';
+                break;
+            case JSON_ERROR_CTRL_CHAR:
+                $msg = 'Unexpected control character found';
+                break;
+            case JSON_ERROR_SYNTAX:
+                $msg = 'Syntax error, malformed JSON';
+                break;
+            case JSON_ERROR_UTF8:
+                $msg = 'Malformed UTF-8 characters, possibly incorrectly encoded';
+                break;
+            default:
+                $msg = 'Unknown error';
+                break;
+        }
+        return "[$code]$msg";
+    }
+
+}

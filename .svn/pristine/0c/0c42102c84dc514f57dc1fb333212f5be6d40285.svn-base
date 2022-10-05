@@ -1,0 +1,8 @@
+<?php
+define('WS_SSO_PLATAFORMA', 'http://salientes.skytel.com.py/sso_plataforma/');
+
+define('DBSERVER','172.30.2.48');
+define('DBNAME','sso_plataforma');
+define('DBUSER','sso');
+define('DBPASS','skytel123');
+?>

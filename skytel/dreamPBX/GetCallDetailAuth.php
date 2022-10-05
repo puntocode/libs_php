@@ -1,0 +1,269 @@
+<?php
+
+namespace skytel\dreamPBX;
+
+require_once dirname(__FILE__) . '/../utils/socket/SocketPersistent.php';
+require_once dirname(__FILE__) . '/../utils/json/JsonUtils.php';
+
+/**
+ * Description of PBXInfo
+ *
+ * @author Endrigo Rivas <endrigo.rivas@gmail.com>
+ * 
+ * $Id: GetCallDetailAuth.php 14317 2015-06-24 14:35:19Z daniel $
+ */
+
+/*
+ // EJ de uso:
+ //Obtiene todos los datos de la llamada
+ //
+if ($uniqueId !== "" && $uniqueId !== NULL) {
+    sleep(2); //El retardo es necesario para que funcione el API de la DREAMPBX
+    $callObj = new \skytel\dreamPBX\GetCallDetailAuth($uniqueId, SOCKET_IP_PBX, SOCKET_PORT_PBX, GET_CALL_AUTH_PBX);
+    $callerid = $callObj->getANI();
+}
+*/
+class GetCallDetailAuth {
+
+    private $uniqueID;
+    private $ip;
+    private $port;
+    private $authKey;
+    private $timeoutConnect;
+    private $timeoutWrite;
+    private $timeoutRead;
+    //Datos de la llamada
+    private $jsonSended;
+    private $jsonResult;
+    private $DNIS;
+    private $destino;
+    private $hora;
+    private $fecha;
+    private $tipo;
+    private $agente;
+    private $evento;
+    private $rutaGrabacion;
+    private $campana;
+    private $origen; //ANI
+    private $success;
+
+    /**
+     * 
+     * @param type $uniqueId
+     * @param type $IP
+     * @param type $port
+     * @param type $timeoutWrite [Default 10 sec]
+     * @param type $timeoutRead [Default 10 sec]
+     * @param type $authKey  Parametro de authenticacion definido en la DreamPBX.
+     */
+    function __construct($uniqueId, $IP, $port, $authKey, $timeoutConnect = 10, $timeoutWrite = 10, $timeoutRead = 10) {
+
+        if (empty($uniqueId)) {
+            throw new \InvalidArgumentException("Falta parametro uniqueId!");
+        }
+        if (empty($IP)) {
+            throw new \InvalidArgumentException("Falta parametro IP!");
+        }
+        if (empty($port)) {
+            throw new \InvalidArgumentException("Falta parametro PORT!");
+        }
+        if (empty($authKey)) {
+            throw new \InvalidArgumentException("Falta parametro authKey!");
+        }
+
+        $this->uniqueID = $uniqueId;
+        $this->ip = $IP;
+        $this->port = $port;
+        $this->timeoutConnect = $timeoutConnect; //Segundos
+        $this->timeoutWrite = $timeoutWrite; //Segundos
+        $this->timeoutRead = $timeoutRead; //Segundos
+        $this->success = "";
+
+        $this->authKey = "AUTHENTICATE-$authKey";
+        $this->jsonSended = json_encode(
+                array(
+                    "EVENT" => "GET_CALL_DETAIL",
+                    "UNIQUEID" => "$uniqueId"
+                )
+        );
+
+        //El API de DreamPBX necesita éste caracter al final de string.
+        $this->authKey .= "\n";
+        $this->jsonSended .= "\n";
+
+        $socket = new \skytel\utils\socket\SocketPersistent($IP, $port,$this->timeoutConnect,$this->timeoutWrite,$this->timeoutRead);
+
+        //Authentication
+        if ($this->authKey !== "") {
+
+            $msgAux = $socket->socketTransmission($this->authKey);
+                if ($msgAux === false) {
+                throw new \Exception($socket->lastError());
+            }
+
+            $ok = $this->__cleanString($msgAux);
+            if ($ok !== "CONNECTED") {
+                throw new \Exception("Se indico una clave de autenticacion pero no fue aceptada!");
+            }
+        }
+
+        //Message
+        $msgAux = $socket->socketTransmission($this->jsonSended);
+        if ($msgAux === false) {
+            throw new \Exception($socket->lastError());
+        }
+
+        $socket->close();
+
+        //Guarda el resultado
+        $this->setJsonResult($msgAux);
+
+        //Carga el resultado en las propiedades de la clase.
+        $this->__populate();
+    }
+
+    public function getJsonResult() {
+        return $this->jsonResult;
+    }
+
+    public function getDNIS() {
+        return $this->DNIS;
+    }
+
+    public function getDestino() {
+        return $this->destino;
+    }
+
+    public function getHora() {
+        return $this->hora;
+    }
+
+    public function getUniqueID() {
+        return $this->uniqueID;
+    }
+
+    public function getFecha() {
+        return $this->fecha;
+    }
+
+    public function getTipo() {
+        return $this->tipo;
+    }
+
+    public function getAgente() {
+        return $this->agente;
+    }
+
+    public function getEvento() {
+        return $this->evento;
+    }
+
+    public function getRutaGrabacion() {
+        return $this->rutaGrabacion;
+    }
+
+    public function getCampana() {
+        return $this->campana;
+    }
+
+    public function getANI() {
+        return $this->origen;
+    }
+
+    /**
+     * Check if the last operation was successful
+     * 
+     * @return Boolean
+     */
+    public function getSuccess() {
+        return $this->success;
+    }
+
+    private function setJsonResult($jsonResult) {
+        $this->jsonResult = $this->__cleanString($jsonResult);
+    }
+
+    private function setDNIS($DNIS) {
+        $this->DNIS = $DNIS;
+    }
+
+    private function setDestino($destino) {
+        $this->destino = $destino;
+    }
+
+    private function setHora($hora) {
+        $this->hora = $hora;
+    }
+
+    private function setFecha($fecha) {
+        $this->fecha = $fecha;
+    }
+
+    private function setTipo($tipo) {
+        $this->tipo = $tipo;
+    }
+
+    private function setAgente($agente) {
+        $this->agente = $agente;
+    }
+
+    private function setEvento($evento) {
+        $this->evento = $evento;
+    }
+
+    private function setRutaGrabacion($rutaGrabacion) {
+        $this->rutaGrabacion = $rutaGrabacion;
+    }
+
+    private function setCampana($campana) {
+        $this->campana = $campana;
+    }
+
+    private function setANI($origen) {
+        $this->origen = $origen;
+    }
+
+    private function setSuccess($success) {
+        $this->success = $success;
+    }
+
+    /**
+     * 
+     * @throws \InvalidArgumentException
+     */
+    private function __populate() {
+
+        $jsonObj = json_decode($this->getJsonResult());
+        if ($jsonObj === NULL) {
+            throw new \InvalidArgumentException("Error: " . \skytel\utils\json\JsonUtils::getJSONErrorMsg());
+        }
+
+        //Save values
+        $this->setDNIS(isset($jsonObj->dnis) ? $jsonObj->dnis : "");
+        $this->setDestino(isset($jsonObj->destino) ? $jsonObj->destino : "");
+        $this->setHora(isset($jsonObj->hora) ? $jsonObj->hora : "");
+        $this->setFecha(isset($jsonObj->fecha) ? $jsonObj->fecha : "");
+        $this->setTipo(isset($jsonObj->tipo) ? $jsonObj->tipo : "");
+        $this->setAgente(isset($jsonObj->agente) ? $jsonObj->agente : "");
+        $this->setEvento(isset($jsonObj->EVENT) ? $jsonObj->EVENT : "");
+        $this->setRutaGrabacion(isset($jsonObj->ruta_grabacion) ? $jsonObj->ruta_grabacion : "");
+        $this->setCampana(isset($jsonObj->campana) ? $jsonObj->campana : "");
+        $this->setANI(isset($jsonObj->origen) ? $jsonObj->origen : "");
+
+        $this->setSuccess(true);
+        if (isset($jsonObj->UNIQUEID) && $jsonObj->UNIQUEID === "NOFOUND"){
+            $this->setSuccess(false);
+        }
+           
+    }
+
+    private function __cleanString($str) {
+
+        //Limpia el caracter de fin de linea.
+        $buscar = array(chr(13) . chr(10), "\r\n", "\n", "\r", "\000");
+        $reemplazar = array("", "", "", "", "");
+
+        return str_ireplace($buscar, $reemplazar, $str);
+    }
+
+}

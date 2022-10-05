@@ -1,0 +1,227 @@
+<?php
+namespace skytel\notificaciones;
+
+/**
+ * [LIBS_PHP] , Skytel. All Rights Reserved. [2013].
+ *
+ * @author Endrigo Rivas <endrigo.rivas@gmail.com>
+ * 
+ * $Id$
+ */
+?>
+<?php
+
+class SMS {
+
+    private $telefono;
+    private $mensaje;
+    private $parametros;
+    private $pais;
+    private $errorMsg;
+
+    public function __construct($telefono, $mensaje, $pais) {
+        
+        //Validations
+        if (!defined("libs_PARAGUAY"))
+            throw new \UnexpectedValueException();
+        
+        if (!defined("libs_ARGENTINA"))
+            throw new \UnexpectedValueException();
+        
+        if (!defined("libs_WSDL_SMS_PY"))
+            throw new \UnexpectedValueException();
+        
+        if (!defined("libs_WSDL_SMS_AR"))
+            throw new \UnexpectedValueException();
+        
+        if (!defined("libs_MAX_LENGHT_SMS"))
+            throw new \UnexpectedValueException();
+        
+
+        $this->telefono = trim($telefono);
+//        $this->mensaje = trim(substr($mensaje, 0, libs_MAX_LENGHT_SMS));
+        $this->mensaje = trim($mensaje);
+        $this->pais = $pais;
+
+        $this->parametros = array();
+        $this->errorMsg = "";
+
+//        if (strlen($mensaje) > libs_MAX_LENGHT_SMS) {
+//            $this->mensaje = $this->mensaje . " ...";
+//        }
+    }
+
+    public function enviar() {
+
+        if ($this->telefono == "") {
+            $this->errorMsg = "Empty phone number";
+            return false;
+        }
+
+        if ($this->pais == "") {
+            $this->errorMsg = "Empty country";
+            return false;
+        }
+
+        if ($this->pais == libs_PARAGUAY) {
+            $webservice = libs_WSDL_SMS_PY;
+        } elseif ($this->pais == libs_ARGENTINA) {
+            $webservice = libs_WSDL_SMS_AR;
+        }
+        
+        if (strlen($this->mensaje) > libs_MAX_LENGHT_SMS) {
+            $cant = ceil(strlen($this->mensaje)/160);
+            for($i=0;$i<$cant;$i++){
+                $mensajes[] = trim(substr($this->mensaje, (libs_MAX_LENGHT_SMS*$i), libs_MAX_LENGHT_SMS));
+            }
+        }
+        
+        foreach ($mensajes as $mensaje){
+            $this->parametros['usuario'] = 'CFARIAS';
+            $this->parametros['clave'] = 'CFARIAS809';
+            $this->parametros['numero'] = $this->__validateARPhone($this->telefono);
+            $this->parametros['texto'] = $this->__encodeMessage($mensaje);
+            $cliente = new \SoapClient($webservice, $this->parametros);
+            $resultado = $cliente->EnviarSMS($this->parametros);
+            $resultado_array[] = $this->__objetoArray($resultado);
+        }
+        for($i=0;$i<$cant;$i++){
+            if ($resultado_array[$i]['EnviarSMSResult'] == 'OK') {
+                $result[$i] = true;
+            } else {
+                $this->errorMsg .= 'Error WS';
+                $result[$i] = false;
+            }
+        }
+//        $this->parametros['phone'] = $this->telefono;
+//        $this->parametros['text'] = $this->__encodeMessage($this->mensaje);
+
+        //Instanciamos el objecto y trabajamos con el protocolo SOAP
+//        $resultado = $cliente->AddNewSingleMessage($this->parametros);
+        
+
+        //llamamos al metodo que nos interesa con los parametros
+
+
+        //TODO.  Queda pendiente obtener la descripcion del error de la conexion
+        //$arreglo=$resultado_array['AddNewSingleMessageResponse'];
+//        if ($resultado_array['AddNewSingleMessageResult'] == '1') {
+//        if ($resultado_array['EnviarSMSResult'] == 'OK') {
+//            return true;
+//        } else {
+//            $this->errorMsg = 'Error WS';
+//            return false;
+//        }
+        if(in_array(false, $result)){
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+//    public function datos($tel, $text) {
+//        $this->telefono = $tel;
+//        $this->mensaje = $text;
+//    }
+//    public function pais($pais) {
+//        $this->pais = $pais;
+//    }
+//    public function setPais($pais) {
+//        $this->pais = $pais;
+//    }
+//
+//    public function setTelefono($telefono) {
+//        $this->telefono = $telefono;
+//    }
+//
+//    public function setMensaje($mensaje) {
+//        $this->mensaje = $mensaje;
+//    }
+
+    public function getErrorMsg() {
+        return $this->errorMsg;
+    }
+
+    private function __objetoArray($obj) {
+        //funcion para los objeto array:
+        $out = array();
+        foreach ($obj as $key => $val) {
+            switch (true) {
+                case is_object($val):
+                    $out[$key] = objetoArray($val);
+                    break;
+                case is_array($val):
+                    $out[$key] = objetoArray($val);
+                    break;
+                default:
+                    $out[$key] = $val;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * 
+     * The message is sended using a HTTP Query.  The accents aren't allowed.
+     *  
+     * 
+     *   Caracteres válidos:
+     *   ---------------------
+     *   . ; , : _ ! <> $ ^ * \" - ' = ? /
+     *
+     *   Caracteres inválidos:
+     *   ---------------------
+     *   ¡ º |  \\  + {} ¿  & % () ª # Ñ ñ áéíóúaäëïöüàèìòùçÇ
+     *
+     * 
+     * 
+     * @param type $message
+     * @return String
+     */
+    private function __encodeMessage($message) {
+
+        $someSpecialChars = array(
+            "á", "é", "í", "ó", "ú",
+            "Á", "É", "Í", "Ó", "Ú",
+            "ä", "ë", "ï", "ö", "ü",
+            "Ä", "Ë", "Ï", "Ö", "Ü",
+            "à", "è", "ì", "ò", "ù",
+            "À", "È", "Ì", "Ò", "Ù",
+            "ç", "Ç", "ñ", "Ñ",
+            "¡", "º", "|", "{", "}", "¿", "&", "%", "ª", "\\"// "#", "(", ")", "+", 
+        );
+
+        $replacementChars = array(
+            "a", "e", "i", "o", "u",
+            "A", "E", "I", "O", "U",
+            "a", "e", "i", "o", "u",
+            "A", "E", "I", "O", "U",
+            "a", "e", "i", "o", "u",
+            "A", "E", "I", "O", "U",
+            "c", "C", "n", "N",
+            "", "", "", "", "", "", "", "", "", "" //,"", "", "", ""
+        );
+
+        $replaced_string = str_replace($someSpecialChars, $replacementChars, $message);
+
+        return $replaced_string;
+//        return urlencode($replaced_string);
+    }
+    
+    private function __validateARPhone($number){
+        $phone = strval($number);
+        if (substr($phone, 0, 1) === "0") {
+            $phone = substr($phone, 1);
+        }
+        if (substr($phone, 2, 2) === "15") {
+            $newphone = substr($phone, 0, 2) . substr($phone, 4);
+        } else if (substr($phone, 3, 2) === "15") {
+            $newphone = substr($phone, 0, 3) . substr($phone, 5);
+        } else if (substr($phone, 4, 2) === "15") {
+            $newphone = substr($phone, 0, 4) . substr($phone, 6);
+        }
+        return $newphone;
+    }
+}
+
+?>
